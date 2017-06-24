@@ -1,4 +1,8 @@
+import 'rxjs/add/observable/combineLatest';
+import 'rxjs/add/operator/first';
+
 import { Injectable } from '@angular/core';
+import { Layer } from 'app/scripts/model/layers';
 import {
   ActionModeService,
   AnimatorService,
@@ -9,9 +13,18 @@ import {
   Store,
 } from 'app/store';
 import { DeleteSelectedModels } from 'app/store/common/actions';
-import { GroupOrUngroupSelectedLayers } from 'app/store/layers/actions';
+import {
+  GroupOrUngroupSelectedLayers,
+  SelectLayer,
+} from 'app/store/layers/actions';
+import {
+  getSelectedLayerIds,
+  getVectorLayer,
+} from 'app/store/layers/selectors';
 import * as $ from 'jquery';
+import * as _ from 'lodash';
 import { ActionCreators } from 'redux-undo';
+import { Observable } from 'rxjs/Observable';
 import { Subject } from 'rxjs/Subject';
 
 export enum Shortcut {
@@ -108,6 +121,16 @@ export class ShortcutService {
         this.animatorService.fastForward();
         return false;
       }
+      if (event.keyCode === 38) {
+        // Up arrow.
+        this.onArrow(event, 'up');
+        return false;
+      }
+      if (event.keyCode === 40) {
+        // Down arrow.
+        this.onArrow(event, 'down');
+        return false;
+      }
       if (event.keyCode === 'R'.charCodeAt(0)) {
         if (this.actionModeService.isShowingSubPathActionMode()) {
           this.actionModeService.reverseSelectedSubPaths();
@@ -173,5 +196,31 @@ export class ShortcutService {
 
   private getCmdOrCtrlText() {
     return ShortcutService.isMac() ? 'Cmd' : 'Ctrl';
+  }
+
+  // TODO: multi-selection doesnt work yet... need to maintain order of selected layer ids?
+  private onArrow(event: { shiftKey?: boolean }, direction: 'up' | 'down') {
+    Observable.combineLatest(
+      this.store.select(getVectorLayer),
+      this.store.select(getSelectedLayerIds),
+    ).first().subscribe(([vl, selectedLayerIds]) => {
+      if (!selectedLayerIds.size) {
+        return;
+      }
+      const layerIds: string[] = [];
+      vl.walk(layer => layerIds.push(layer.id));
+      const index = _.findIndex(layerIds, layerId => selectedLayerIds.has(layerId));
+      const clearExisting = !event.shiftKey;
+      if (direction === 'up') {
+        if (index > 0) {
+          this.store.dispatch(
+            new SelectLayer(layerIds[index - 1], clearExisting));
+        }
+      } else {
+        if (index + 1 < layerIds.length - 1) {
+          this.store.dispatch(new SelectLayer(layerIds[index + 1], clearExisting));
+        }
+      }
+    });
   }
 }
