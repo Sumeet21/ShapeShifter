@@ -8,4 +8,3 @@ export { polygonCentroid } from './polygonCentroid';
 export { polygonLength } from './polygonLength';
 export { range } from './range';
 export { shuffle } from './shuffle';
-export { sum } from './sum';

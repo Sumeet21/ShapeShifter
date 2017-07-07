@@ -8,8 +8,8 @@ import {
   polygonArea,
   polygonCentroid,
   polygonLength,
+  range,
   shuffle,
-  sum,
 } from 'app/scripts/d3';
 import { Geometry, Point, Polygon, Triangle } from 'app/scripts/d3/types';
 import * as earcut from 'earcut';
@@ -45,18 +45,14 @@ export function triangulate(fromPath: Path, toPath: Path) {
   const hawaiiPoints = toPath
     .getSubPaths()
     .map(s => s.getCommands().map(c => [c.getEnd().x, c.getEnd().y] as Point));
-  console.info(toPath, hawaiiPoints);
-  const destinations = hawaiiPoints; /*.map(function(poly) {
-    console.info(poly[0]);
-    return poly[0];
-  });*/
+  const destinations = hawaiiPoints;
 
   // Get array of tweenable pairs of rings
   const pairs = getTweenablePairs(pieces, destinations);
   console.info(pairs);
 
   // Collate the pairs into before/after path strings
-  var pathStrings: any[] = [
+  const pathStrings: any[] = [
     pairs
       .map(function(d) {
         return join(d[0]);
@@ -75,28 +71,29 @@ export function triangulate(fromPath: Path, toPath: Path) {
 }
 
 function createTopology(triangles: ReadonlyArray<Triangle>, points: ReadonlyArray<Point>) {
-  var arcIndices = {},
-    topology = {
-      type: 'Topology',
-      objects: {
-        triangles: {
-          type: 'GeometryCollection',
-          geometries: [],
-        },
+  const arcIndices = {};
+  const topology = {
+    type: 'Topology',
+    objects: {
+      triangles: {
+        type: 'GeometryCollection',
+        geometries: [],
       },
-      arcs: [],
-    };
+    },
+    arcs: [],
+  };
 
   triangles.forEach(function(triangle) {
-    var geometry = [];
+    const geometry = [];
 
     triangle.forEach(function(arc, i) {
-      var slug = arc[0] < arc[1] ? arc.join(',') : arc[1] + ',' + arc[0],
+      const slug = arc[0] < arc[1] ? arc.join(',') : arc[1] + ',' + arc[0],
         coordinates = arc.map(function(pointIndex) {
           return points[pointIndex];
         });
 
       if (slug in arcIndices) {
+        // tslint:disable-next-line: no-bitwise
         geometry.push(~arcIndices[slug]);
       } else {
         geometry.push((arcIndices[slug] = topology.arcs.length));
@@ -118,9 +115,7 @@ function createTopology(triangles: ReadonlyArray<Triangle>, points: ReadonlyArra
   });
 
   // Sort smallest first
-  topology.objects.triangles.geometries.sort(function(a, b) {
-    return a.area - b.area;
-  });
+  topology.objects.triangles.geometries.sort((a, b) => a.area - b.area);
 
   return topology as Topology;
 }
@@ -134,7 +129,6 @@ function collapse(topology: Topology, numPieces: number) {
     const smallest = geometries[0];
     const neighborIndex = shuffle(neighbors(geometries)[0])[0];
     const neighbor = geometries[neighborIndex as number];
-    // console.info(smallest, neighbors(geometries), neighborIndex);
     // TODO: remove cast to any
     const merged: any = mergeArcs(topology, [smallest, neighbor]);
     let features;
@@ -177,13 +171,8 @@ function ascendingComparator<D>(fn: (d: D) => number) {
 }
 
 function getTweenablePairs(start, end) {
-  console.info(start, end);
-
   // Rearrange order of polygons for least movement.
-  start = closestCentroids(start, end);
-  return start.map(function(a, i) {
-    return align(a.slice(0), end[i].slice(0));
-  });
+  return closestCentroids(start, end).map((a, i) => align(a.slice(0), end[i].slice(0)));
 }
 
 function align(a, b) {
@@ -192,7 +181,7 @@ function align(a, b) {
     a.reverse();
   }
 
-  // Smooth out by bisecting long triangulation cuts
+  // Smooth out by bisecting long triangulation cuts.
   bisectSegments(a, 25);
   bisectSegments(b, 25);
 
@@ -203,23 +192,23 @@ function align(a, b) {
     addPoints(b, a.length - b.length);
   }
 
-  // Wind the first to minimize sum-of-squares distance to the second
+  // Wind the first to minimize sum-of-squares distance to the second.
   return [wind(a, b), b];
 }
 
 function addPoints(ring, numPoints) {
-  var desiredLength = ring.length + numPoints,
-    step = polygonLength(ring) / numPoints;
+  const desiredLength = ring.length + numPoints;
+  const step = polygonLength(ring) / numPoints;
 
-  var i = 0,
-    cursor = 0,
-    insertAt = step / 2;
+  let i = 0;
+  let cursor = 0;
+  let insertAt = step / 2;
 
   while (ring.length < desiredLength) {
-    var a = ring[i],
-      b = ring[(i + 1) % ring.length];
+    const a = ring[i];
+    const b = ring[(i + 1) % ring.length];
 
-    var segment = distanceBetween(a, b);
+    const segment = distanceBetween(a, b);
 
     if (insertAt <= cursor + segment) {
       ring.splice(i + 1, 0, pointBetween(a, b, (insertAt - cursor) / segment));
@@ -233,20 +222,20 @@ function addPoints(ring, numPoints) {
 }
 
 function wind(ring, vs) {
-  var len = ring.length,
-    min = Infinity,
-    bestOffset;
+  let min = Infinity;
+  let bestOffset = 0;
 
-  for (var offset = 0, len = ring.length; offset < len; offset++) {
-    var s = sum(
-      vs.map(function(p, i) {
-        var distance = distanceBetween(ring[(offset + i) % len], p);
-        return distance * distance;
+  for (let offset = 0; offset < ring.length; offset++) {
+    const sum = _.sumBy(
+      vs.map((p, i) => {
+        const dist = distanceBetween(ring[(offset + i) % ring.length], p);
+        return dist * dist;
       }),
+      s => +s,
     );
 
-    if (s < min) {
-      min = s;
+    if (sum < min) {
+      min = sum;
       bestOffset = offset;
     }
   }
@@ -254,41 +243,23 @@ function wind(ring, vs) {
   return ring.slice(bestOffset).concat(ring.slice(0, bestOffset));
 }
 
-function range(start, stop?, step?) {
-  (start = +start), (stop = +stop), (step =
-    (n = arguments.length) < 2 ? ((stop = start), (start = 0), 1) : n < 3 ? 1 : +step);
-
-  var i = -1,
-    n = Math.max(0, Math.ceil((stop - start) / step)) | 0,
-    rng = new Array(n);
-
-  while (++i < n) {
-    rng[i] = start + i * step;
-  }
-
-  return rng;
-}
-
 // Find ordering of first set that minimizes squared distance between centroid pairs
 // Could loosely optimize instead of trying every permutation (would probably have to with 10+ pieces)
 function closestCentroids(start, end) {
-  var min = Infinity,
-    best,
-    distances = start.map(function(p1) {
-      return end.map(function(p2) {
-        var distance = distanceBetween(polygonCentroid(p1), polygonCentroid(p2));
-        return distance * distance;
-      });
+  let min = Infinity;
+  let best;
+  const distances = start.map(p1 => {
+    return end.map(function(p2) {
+      const dist = distanceBetween(polygonCentroid(p1), polygonCentroid(p2));
+      return dist * dist;
     });
+  });
 
-  function permute(arr, order?, s?) {
-    var cur,
-      distance,
-      order = order || [],
-      s = s || 0;
+  (function permute(arr, order = [], s = 0) {
+    let distance: number;
 
-    for (var i = 0; i < arr.length; i++) {
-      cur = arr.splice(i, 1);
+    for (let i = 0; i < arr.length; i++) {
+      const cur = arr.splice(i, 1);
       distance = distances[cur[0]][order.length];
       if (arr.length) {
         permute(arr.slice(), order.concat(cur), s + distance);
@@ -298,35 +269,30 @@ function closestCentroids(start, end) {
         best = order.concat(cur);
       }
     }
-  }
+  })(range(start.length));
 
-  permute(range(start.length));
-
-  return best.map(function(i) {
-    return start[i];
-  });
+  return best.map(i => start[i]);
 }
 
-function bisectSegments(ring, threshold) {
-  for (var i = 0; i < ring.length - 1; i++) {
+function bisectSegments(ring: Point[], threshold: number) {
+  for (let i = 0; i < ring.length - 1; i++) {
     while (distanceBetween(ring[i], ring[i + 1]) > threshold) {
       ring.splice(i + 1, 0, pointBetween(ring[i], ring[i + 1], 0.5));
     }
   }
 }
 
-function distanceBetween(a, b) {
-  var dx = a[0] - b[0],
-    dy = a[1] - b[1];
-
+function distanceBetween(a: Point, b: Point) {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function pointBetween(a, b, pct) {
+function pointBetween(a: Point, b: Point, pct: number): Point {
   return [a[0] + (b[0] - a[0]) * pct, a[1] + (b[1] - a[1]) * pct];
 }
 
-function join(ring) {
+function join(ring: ReadonlyArray<Point>) {
   return 'M' + ring.join('L') + 'Z';
 }
 
