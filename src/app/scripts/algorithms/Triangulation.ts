@@ -20,7 +20,7 @@ interface Topology {
   readonly objects: {
     readonly triangles: {
       readonly type: string;
-      readonly geometries: Array<Geometry>; // TODO: make this a readonly array
+      readonly geometries: ReadonlyArray<Geometry>;
     };
   };
   readonly arcs: ReadonlyArray<[Point, Point]>;
@@ -122,7 +122,7 @@ function createTopology(triangles: ReadonlyArray<Triangle>, points: ReadonlyArra
 
 // Merge polygons into neighbors one at a time until only numPieces remain.
 function collapse(topology: Topology, numPieces: number) {
-  const geometries = topology.objects.triangles.geometries;
+  const geometries = topology.objects.triangles.geometries.slice();
   const bisectorLeft = bisector(ascendingComparator((d: { area: number }) => d.area)).left;
 
   function mergeSmallestFeature() {
