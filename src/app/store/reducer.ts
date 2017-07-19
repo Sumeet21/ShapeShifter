@@ -1,4 +1,4 @@
-import { Action, ActionReducer, combineReducers, compose } from '@ngrx/store';
+import { Action, ActionReducer, ActionReducerMap, combineReducers, compose } from '@ngrx/store';
 import { environment } from 'environments/environment';
 import { storeLogger } from 'ngrx-store-logger';
 
@@ -24,7 +24,7 @@ export interface AppState {
   readonly theme: fromTheme.State;
 }
 
-const sliceReducers = {
+export const reducers: ActionReducerMap<AppState> = {
   layers: fromLayers.reducer,
   timeline: fromTimeline.reducer,
   playback: fromPlayback.reducer,
@@ -33,7 +33,7 @@ const sliceReducers = {
   theme: fromTheme.reducer,
 };
 
-const prodMetaReducers = [
+const prodMetaReducers: ActionReducer<any, any>[] = [
   // Meta-reducer that records past/present/future state.
   metaUndoRedo.metaReducer,
   // Meta-reducer that adds the ability to dispatch multiple actions at a time.
@@ -44,22 +44,16 @@ const prodMetaReducers = [
   combineReducers,
 ];
 
-const devMetaReducers = [
+const devMetaReducers: ActionReducer<any, any>[] = [
   // Meta reducer that logs the before/after state of the store
   // as actions are performed in dev builds.
   storeLogger({ collapsed: true }),
   // Meta reducer that freezes the state tree to ensure that
   // accidental mutations fail fast in dev builds.
   metaStoreFreeze.metaReducer,
+  ...prodMetaReducers,
 ];
 
-export const prodReducer = compose(...prodMetaReducers)(sliceReducers) as ActionReducer<State>;
-const devReducer = compose(...devMetaReducers)(prodReducer) as ActionReducer<State>;
-
-export function reducer(state: State, action: Action) {
-  if (environment.production) {
-    return prodReducer(state, action);
-  } else {
-    return devReducer(state, action);
-  }
+export function getMetaReducers() {
+  return environment.production ? prodMetaReducers : devMetaReducers;
 }

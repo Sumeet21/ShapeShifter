@@ -60,7 +60,7 @@ import {
   LayerTimelineGridDirective,
   TimelineAnimationRowComponent,
 } from './components/layertimeline';
-import { reducer } from './store';
+import { getMetaReducers, reducers } from './store';
 
 @NgModule({
   declarations: [
@@ -91,7 +91,7 @@ import { reducer } from './store';
     FlexLayoutModule,
     FormsModule,
     HttpModule,
-    StoreModule.forRoot(reducer),
+    StoreModule.forRoot(reducers, { metaReducers: getMetaReducers() }),
     // Angular material components.
     MdButtonModule,
     MdDialogModule,

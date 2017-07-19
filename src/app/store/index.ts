@@ -1,2 +1,2 @@
 export { Store } from '@ngrx/store';
-export { State, reducer, prodReducer } from './reducer';
+export { State, reducers, getMetaReducers } from './reducer';

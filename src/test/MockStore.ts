@@ -1,5 +1,5 @@
 import { Action, ActionsSubject, ReducerManager, StateObservable, Store } from '@ngrx/store';
-import { State, prodReducer } from 'app/store';
+import { State } from 'app/store';
 import { State as LayerState } from 'app/store/layers/reducer';
 import { State as PlaybackState } from 'app/store/playback/reducer';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
@@ -12,7 +12,7 @@ export class MockStore extends Store<State> {
 
   constructor() {
     super(undefined as StateObservable, undefined as ActionsSubject, undefined as ReducerManager);
-    this.subject = new BehaviorSubject(prodReducer(undefined, INIT_ACTION));
+    this.subject = new BehaviorSubject(undefined);
   }
 
   select<T>(mapFn: (state: State) => T): Store<T> {
