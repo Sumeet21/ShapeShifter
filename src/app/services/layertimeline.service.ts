@@ -4,9 +4,17 @@ import 'rxjs/add/observable/combineLatest';
 import { Injectable } from '@angular/core';
 import { Action } from '@ngrx/store';
 import { INTERPOLATORS } from 'app/model/interpolators';
-import { GroupLayer, Layer, LayerUtil, VectorLayer } from 'app/model/layers';
+import {
+  ClipPathLayer,
+  GroupLayer,
+  Layer,
+  LayerUtil,
+  PathLayer,
+  VectorLayer,
+} from 'app/model/layers';
+import { Path } from 'app/model/paths';
 import { Animation, AnimationBlock } from 'app/model/timeline';
-import { ModelUtil } from 'app/scripts/common';
+import { Matrix, ModelUtil } from 'app/scripts/common';
 import { State, Store } from 'app/store';
 import {
   SetCollapsedLayers,
@@ -180,25 +188,166 @@ export class LayerTimelineService {
       if (!(selectedLayer instanceof VectorLayer)) {
         // Add the new layer as a sibling to the currently selected layer.
         const parent = LayerUtil.findParent(vl, selectedLayer.id).clone();
-        const children = [...parent.children];
-        parent.children = children.concat([layer]);
-        this.replaceLayer(parent);
+        parent.children = [...parent.children, layer];
+        this.updateLayer(parent);
         return;
       }
     }
     const vectorLayer = vl.clone();
     vectorLayer.children = [...vectorLayer.children, layer];
-    this.replaceLayer(vectorLayer);
+    this.updateLayer(vectorLayer);
   }
 
+  /**
+   * Sets the current vector layer.
+   */
   setVectorLayer(vl: VectorLayer) {
     this.store.dispatch(new SetVectorLayer(vl));
   }
 
-  replaceLayer(layer: Layer) {
-    this.setVectorLayer(LayerUtil.replaceLayerInTree(this.getVectorLayer(), layer));
+  /**
+   * Updates an existing layer in the tree.
+   */
+  updateLayer(layer: Layer) {
+    this.store.dispatch(new SetVectorLayer(LayerUtil.updateLayer(this.getVectorLayer(), layer)));
   }
 
+  /**
+   * Replaces an existing layer in the tree with a new layer with a
+   * potentially different ID. Any state associate with the deleted
+   * ID will be removed.
+   */
+  replaceLayer(layerId: string, newLayer: Layer) {
+    if (layerId === newLayer.id) {
+      this.updateLayer(newLayer);
+      return;
+    }
+    // TODO: rethink all of this crap... maybe add a 'swap layers' method too?
+    const vl = this.getVectorLayer();
+    const layer = vl.findLayerById(layerId);
+    const parent = LayerUtil.findParent(vl, layerId);
+    const children = [...parent.children];
+    const layerIndex = _.findIndex(children, l => l.id === layerId);
+    children.splice(layerIndex, 1, newLayer);
+    const clonedParent = parent.clone();
+    clonedParent.children = children;
+    const actions: Action[] = [new SetVectorLayer(LayerUtil.updateLayer(vl, clonedParent))];
+    const animation = this.getAnimation();
+    const layerBlocks = animation.blocks.filter(b => b.layerId === newLayer.id);
+    const animatableProperties = new Set(newLayer.animatableProperties.keys());
+    const newLayerBlocks = layerBlocks.filter(b => animatableProperties.has(b.propertyName));
+    if (layerBlocks.length !== newLayerBlocks.length) {
+      const newAnimation = animation.clone();
+      newAnimation.blocks = [
+        ...animation.blocks.filter(b => b.layerId !== newLayer.id),
+        ...newLayerBlocks,
+      ];
+      actions.push(new SetAnimation(newAnimation));
+    }
+    this.updateLayer(clonedParent);
+  }
+
+  /**
+   * Merges the specified group layer into its children layers.
+   */
+  mergeGroupLayer(layerId: string) {
+    const vl = this.getVectorLayer();
+    const layer = vl.findLayerById(layerId) as GroupLayer;
+    if (!layer.children.length) {
+      return;
+    }
+    const parent = LayerUtil.findParent(vl, layerId);
+    const layerIndex = _.findIndex(parent.children, l => l.id === layer.id);
+    const getTransformsFn = (l: GroupLayer) => [
+      Matrix.fromTranslation(l.pivotX, l.pivotY),
+      Matrix.fromTranslation(l.translateX, l.translateY),
+      Matrix.fromRotation(l.rotation),
+      Matrix.fromScaling(l.scaleX, l.scaleY),
+      Matrix.fromTranslation(-l.pivotX, -l.pivotY),
+    ];
+    const transforms = getTransformsFn(layer);
+    const transformedChildren = layer.children.map(
+      (l: GroupLayer | PathLayer | ClipPathLayer): Layer => {
+        if (l instanceof GroupLayer) {
+          // TODO: implement this
+          return l.clone();
+        }
+        const path = l.pathData;
+        if (!path || !l.pathData.getPathString()) {
+          return l;
+        }
+        const clonedLayer = l.clone();
+        clonedLayer.pathData = new Path(
+          path.mutate().addTransforms(transforms).build().getPathString(),
+        );
+        return clonedLayer;
+      },
+    );
+    const parentChildren = [...parent.children];
+    parentChildren.splice(layerIndex, 1, ...transformedChildren);
+    const clonedParent = parent.clone();
+    clonedParent.children = parentChildren;
+    // TODO: perform these actions in batch
+    // TODO: also need to remove id from collapsed id list, hidden id list, etc.
+    this.clearSelections();
+    this.updateLayer(clonedParent);
+  }
+
+  /**
+   * Builds a list of actions to dispatch in order to cleanup after
+   * the deletion of the specified IDs.
+   */
+  private buildCleanupLayerStateActions(...deletedLayerIds: string[]) {
+    // const collapsedLayerIds = this.getCollapsedLayerIds();
+    // const hiddenLayerIds = this.getHiddenLayerIds();
+    // const selectedLayerIds = this.getSelectedLayerIds();
+    // const differenceFn = (s: Set<string>, a: string[]) => new Set(_.difference(Array.from(s), a));
+    // const actions: Action[] = [];
+    // if (deletedLayerIds.some(id => collapsedLayerIds.has(id))) {
+    //   actions.push(new SetCollapsedLayers(differenceFn(collapsedLayerIds, deletedLayerIds)));
+    // }
+    // if (deletedLayerIds.some(id => hiddenLayerIds.has(id))) {
+    //   actions.push(new SetHiddenLayers(differenceFn(hiddenLayerIds, deletedLayerIds)));
+    // }
+    // if (deletedLayerIds.some(id => selectedLayerIds.has(id))) {
+    //   actions.push(new SetSelectedLayers(differenceFn(selectedLayerIds, deletedLayerIds)));
+    // }
+    // const animationBlocks = this.getAnimation().blocks;
+    // if (animationBlocks.some(b => deletedLayerIds.includes(b.layerId))) {
+    //   const newAnimation = this.getAnimation().clone();
+    //   newAnimation.blocks = newAnimation.blocks.filter(b => !deletedLayerIds.includes(b.layerId));
+    // }
+    // let animation = this.getAnimation();
+    // if (this.isAnimationSelected()) {
+    //   animation = new Animation();
+    // }
+    // const selectedBlockIds = this.getSelectedBlockIds();
+    // if (selectedBlockIds.size) {
+    //   animation = animation.clone();
+    //   animation.blocks = animation.blocks.filter(b => !selectedBlockIds.has(b.id));
+    // }
+    // // Remove any blocks corresponding to deleted layers.
+    // const filteredBlocks = animation.blocks.filter(b => !!vl.findLayerById(b.layerId));
+    // if (filteredBlocks.length !== animation.blocks.length) {
+    //   animation = animation.clone();
+    //   animation.blocks = filteredBlocks;
+    // }
+    // this.store.dispatch(
+    //   new MultiAction(
+    //     new SetVectorLayer(vl),
+    //     new SetCollapsedLayers(collapsedLayerIds),
+    //     new SetHiddenLayers(hiddenLayerIds),
+    //     new SetSelectedLayers(new Set()),
+    //     new SelectAnimation(false),
+    //     new SetAnimation(animation),
+    //     new SetSelectedBlocks(new Set()),
+    //   ),
+    // );
+  }
+
+  /**
+   * Groups or ungroups the selected layers.
+   */
   groupOrUngroupSelectedLayers(shouldGroup: boolean) {
     let selectedLayerIds = this.getSelectedLayerIds();
     if (!selectedLayerIds.size) {
@@ -208,15 +357,15 @@ export class LayerTimelineService {
 
     // Sort selected layers by order they appear in tree.
     let tempSelLayers = Array.from(selectedLayerIds).map(id => vectorLayer.findLayerById(id));
-    const selLayerOrdersMap = new Map<string, number>();
+    const selLayerOrdersMap: Dictionary<number> = {};
     let n = 0;
     vectorLayer.walk(layer => {
       if (_.find(tempSelLayers, l => l.id === layer.id)) {
-        selLayerOrdersMap.set(layer.id, n);
+        selLayerOrdersMap[layer.id] = n;
         n++;
       }
     });
-    tempSelLayers.sort((a, b) => selLayerOrdersMap.get(a.id) - selLayerOrdersMap.get(b.id));
+    tempSelLayers.sort((a, b) => selLayerOrdersMap[a.id] - selLayerOrdersMap[b.id]);
 
     if (shouldGroup) {
       // Remove any layers that are descendants of other selected layers,
@@ -260,7 +409,7 @@ export class LayerTimelineService {
         _.find(tempSelLayers, selectedLayer => selectedLayer.id === child.id),
       );
       firstSelectedLayerParent.children = parentChildren;
-      vectorLayer = LayerUtil.replaceLayerInTree(vectorLayer, firstSelectedLayerParent);
+      vectorLayer = LayerUtil.updateLayer(vectorLayer, firstSelectedLayerParent);
       selectedLayerIds = new Set([newGroup.id]);
     } else {
       // Ungroup selected groups layers.
@@ -275,10 +424,10 @@ export class LayerTimelineService {
         const newChildren = [...parent.children];
         newChildren.splice(indexInParent, 0, ...groupLayer.children);
         parent.children = newChildren;
-        vectorLayer = LayerUtil.replaceLayerInTree(vectorLayer, parent);
+        vectorLayer = LayerUtil.updateLayer(vectorLayer, parent);
         newSelectedLayers.splice(0, 0, ...groupLayer.children);
         // Delete the parent.
-        vectorLayer = LayerUtil.removeLayersFromTree(vectorLayer, groupLayer.id);
+        vectorLayer = LayerUtil.removeLayers(vectorLayer, groupLayer.id);
       });
       selectedLayerIds = new Set(newSelectedLayers.map(l => l.id));
     }
@@ -299,7 +448,7 @@ export class LayerTimelineService {
       hiddenLayerIds.clear();
     } else {
       selectedLayerIds.forEach(layerId => {
-        vl = LayerUtil.removeLayersFromTree(vl, layerId);
+        vl = LayerUtil.removeLayers(vl, layerId);
         collapsedLayerIds.delete(layerId);
         hiddenLayerIds.delete(layerId);
       });
@@ -336,7 +485,7 @@ export class LayerTimelineService {
     );
   }
 
-  replaceBlocks(blocks: ReadonlyArray<AnimationBlock>) {
+  updateBlocks(blocks: ReadonlyArray<AnimationBlock>) {
     if (!blocks.length) {
       return;
     }

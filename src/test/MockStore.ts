@@ -3,6 +3,8 @@ import { State } from 'app/store';
 import { State as LayerState } from 'app/store/layers/reducer';
 import { State as PlaybackState } from 'app/store/playback/reducer';
 import { BehaviorSubject } from 'rxjs/BehaviorSubject';
+import { Observable } from 'rxjs/Observable';
+import { Observer } from 'rxjs/Observer';
 import { map } from 'rxjs/operator/map';
 
 const INIT_ACTION: Action = { type: '__test123__' };
@@ -15,9 +17,9 @@ export class MockStore extends Store<State> {
     this.subject = new BehaviorSubject(undefined);
   }
 
-  select<T>(mapFn: (state: State) => T): Store<T> {
+  readonly select = <R>(mapFn: any, ...paths: string[]): Observable<R> => {
     return map.call(this.subject, mapFn);
-  }
+  };
 
   dispatch(action: Action) {}
 

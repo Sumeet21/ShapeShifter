@@ -6,7 +6,7 @@ import {
   OnInit,
   Output,
 } from '@angular/core';
-import { GroupLayer, Layer, VectorLayer } from 'app/model/layers';
+import { ClipPathLayer, GroupLayer, Layer, PathLayer, VectorLayer } from 'app/model/layers';
 import { Animation } from 'app/model/timeline';
 import { ModelUtil } from 'app/scripts/common';
 import { ActionModeService } from 'app/services';
@@ -35,6 +35,9 @@ export class LayerListTreeComponent implements OnInit, Callbacks {
   @Output() layerToggleExpanded = new EventEmitter<LayerEvent>();
   @Output() layerToggleVisibility = new EventEmitter<LayerEvent>();
   @Output() addTimelineBlockClick = new EventEmitter<TimelineBlockEvent>();
+  @Output() convertToClipPathClick = new EventEmitter<LayerEvent>();
+  @Output() convertToPathClick = new EventEmitter<LayerEvent>();
+  @Output() mergeGroupClick = new EventEmitter<LayerEvent>();
 
   constructor(
     private readonly store: Store<State>,
@@ -52,6 +55,12 @@ export class LayerListTreeComponent implements OnInit, Callbacks {
         const existingPropertyNames = Array.from(
           _.keys(ModelUtil.getOrderedBlocksByPropertyByLayer(animation)[this.layer.id]),
         );
+        const isClipPathLayer = this.layer instanceof ClipPathLayer;
+        const isPathLayer = this.layer instanceof PathLayer;
+        const isMergeable =
+          this.layer instanceof GroupLayer &&
+          this.layer.children.length > 0 &&
+          existingPropertyNames.length === 0;
         return {
           animation,
           isSelected: selectedLayerIds.has(this.layer.id),
@@ -61,6 +70,10 @@ export class LayerListTreeComponent implements OnInit, Callbacks {
           availablePropertyNames,
           existingPropertyNames,
           isActionMode,
+          isClipPathLayer,
+          isPathLayer,
+          isMorphableLayer: isClipPathLayer || isPathLayer,
+          isMergeable,
         };
       });
   }
@@ -103,9 +116,32 @@ export class LayerListTreeComponent implements OnInit, Callbacks {
     }
   }
 
+  // @Override Callbacks
+  onConvertToClipPathClick(event: MouseEvent, layer: Layer) {
+    if (!this.actionModeService.isActionMode()) {
+      this.convertToClipPathClick.emit({ event, layer });
+    }
+  }
+
+  // @Override Callbacks
+  onConvertToPathClick(event: MouseEvent, layer: Layer) {
+    if (!this.actionModeService.isActionMode()) {
+      this.convertToPathClick.emit({ event, layer });
+    }
+  }
+
+  // @Override Callbacks
+  onMergeGroupClick(event: MouseEvent, layer: Layer) {
+    if (!this.actionModeService.isActionMode()) {
+      this.mergeGroupClick.emit({ event, layer });
+    }
+  }
+
   // Used by *ngFor loop.
   trackLayerFn(index: number, layer: Layer) {
-    return layer.id;
+    // NOTE: if the layer's prefix changes then recreate the element
+    // TODO: avoid this hack
+    return layer.id + ',' + layer.getPrefix();
   }
 
   private isLayerExpandable() {
@@ -119,6 +155,9 @@ export interface Callbacks {
   onLayerToggleExpanded(event: MouseEvent, layer: Layer): void;
   onLayerToggleVisibility(event: MouseEvent, layer: Layer): void;
   onAddTimelineBlockClick(event: MouseEvent, layer: Layer, propertyName: string): void;
+  onConvertToClipPathClick(event: MouseEvent, layer: Layer): void;
+  onConvertToPathClick(event: MouseEvent, layer: Layer): void;
+  onMergeGroupClick(event: MouseEvent, layer: Layer): void;
 }
 
 // tslint:disable: no-unused-variable

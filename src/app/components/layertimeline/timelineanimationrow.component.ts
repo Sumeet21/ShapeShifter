@@ -82,7 +82,9 @@ export class TimelineAnimationRowComponent implements OnInit, Callbacks {
 
   // Used by *ngFor loop.
   trackLayerFn(index: number, layer: Layer) {
-    return layer.id;
+    // NOTE: if the layer's prefix changes then recreate the element
+    // TODO: avoid this hack
+    return layer.id + ',' + layer.getPrefix();
   }
 }
 
@@ -100,7 +102,7 @@ interface AnimationRowEvent {
 
 interface AnimationRowModel {
   readonly animation: Animation;
-  readonly blocksByPropertyNameValues: ReadonlyArray<ReadonlyArray<AnimationBlock>>;
+  readonly blocksByPropertyNameValues: ReadonlyTable<AnimationBlock>;
   readonly isExpanded: boolean;
   readonly selectedBlockIds: Set<string>;
   readonly isActionMode: boolean;

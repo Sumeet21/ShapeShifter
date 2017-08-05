@@ -357,7 +357,7 @@ export class ActionModeService {
   // Autofix.
 
   autoFix() {
-    const { from, to } = AutoAwesome.autoFix(
+    const [from, to] = AutoAwesome.autoFix(
       this.getActivePathBlockValue(ActionSource.From),
       this.getActivePathBlockValue(ActionSource.To),
     );
@@ -457,76 +457,30 @@ export class ActionModeService {
     animation = this.layerTimelineService.getAnimation(),
   ) {
     const blockId = this.getActivePathBlock().id;
-    const blocks = [...animation.blocks];
-    const blockIndex = _.findIndex(blocks, b => b.id === blockId);
-    let block = blocks[blockIndex];
+    const blockIndex = _.findIndex(animation.blocks, b => b.id === blockId);
+    const block = animation.blocks[blockIndex] as PathAnimationBlock;
 
     // Remove any existing conversions and collapsing sub paths from the path.
-    const pm = path.mutate();
-    path.getSubPaths().forEach((unused, subIdx) => pm.unconvertSubPath(subIdx));
-    path = pm.deleteCollapsingSubPaths().build();
-
-    const getBlockPathFn = (t: ActionSource) => {
-      return t === ActionSource.From ? block.fromValue : block.toValue;
-    };
-    const setBlockPathFn = (t: ActionSource, p: Path) => {
-      block = block.clone();
-      if (t === ActionSource.From) {
-        block.fromValue = p;
-      } else {
-        block.toValue = p;
-      }
-    };
-
     const oppSource = source === ActionSource.From ? ActionSource.To : ActionSource.From;
-    let oppPath = getBlockPathFn(oppSource);
-    if (oppPath) {
-      oppPath = oppPath.mutate().deleteCollapsingSubPaths().build();
-      const numSubPaths = path.getSubPaths().length;
-      const numOppSubPaths = oppPath.getSubPaths().length;
-      if (numSubPaths !== numOppSubPaths) {
-        const pathToChange = numSubPaths < numOppSubPaths ? path : oppPath;
-        const oppPathToChange = numSubPaths < numOppSubPaths ? oppPath : path;
-        const minIdx = Math.min(numSubPaths, numOppSubPaths);
-        const maxIdx = Math.max(numSubPaths, numOppSubPaths);
-        const mutator = pathToChange.mutate();
-        for (let i = minIdx; i < maxIdx; i++) {
-          // TODO: allow the user to specify the location of collapsing paths?
-          const pole = oppPathToChange.getPoleOfInaccessibility(i);
-          mutator.addCollapsingSubPath(pole, oppPathToChange.getSubPath(i).getCommands().length);
-        }
-        if (numSubPaths < numOppSubPaths) {
-          path = mutator.build();
-        } else {
-          oppPath = mutator.build();
-        }
-      }
-      for (let subIdx = 0; subIdx < Math.max(numSubPaths, numOppSubPaths); subIdx++) {
-        const numCmds = path.getSubPath(subIdx).getCommands().length;
-        const numOppCommands = oppPath.getSubPath(subIdx).getCommands().length;
-        if (numCmds === numOppCommands) {
-          // Only auto convert when the number of commands in both canvases
-          // are equal. Otherwise we'll wait for the user to add more points.
-          const autoConvertResults = AutoAwesome.autoConvert(
-            subIdx,
-            path,
-            oppPath.mutate().unconvertSubPath(subIdx).build(),
-          );
-          path = autoConvertResults.from;
+    let oppPath = oppSource === ActionSource.From ? block.fromValue : block.toValue;
+    [path, oppPath] = AutoAwesome.autoAddCollapsingSubPaths(path, oppPath);
+    [path, oppPath] = AutoAwesome.autoConvert(path, oppPath);
 
-          // This is the one case where a change in one canvas type's vector layer
-          // will cause corresponding changes to be made in the opposite canvas type's
-          // vector layer.
-          oppPath = autoConvertResults.to;
-        }
+    const setBlockValueFn = (b: PathAnimationBlock, t: ActionSource, p: Path) => {
+      if (t === ActionSource.From) {
+        b.fromValue = p;
+      } else {
+        b.toValue = p;
       }
-    }
-    setBlockPathFn(source, path);
-    setBlockPathFn(oppSource, oppPath);
+    };
 
-    blocks[blockIndex] = block;
+    const newBlock = block.clone();
+    setBlockValueFn(newBlock, source, path);
+    setBlockValueFn(newBlock, oppSource, oppPath);
+
+    const newBlocks = animation.blocks.map((b, i) => (i === blockIndex ? newBlock : b));
     animation = animation.clone();
-    animation.blocks = blocks;
+    animation.blocks = newBlocks;
     return animation;
   }
 
