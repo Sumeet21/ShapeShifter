@@ -29,7 +29,7 @@
     "@angular/platform-browser-dynamic": "^4.3.0",
     "@angular/router": "^4.3.0",
     "@angular/service-worker": "^1.0.0-beta.16",
-    "@ngrx/store": "^4.0.0",
+    "@ngrx/store": "^4.0.2",
     "bezier-js": "^2.2.3",
     "core-js": "^2.4.1",
     "css-select": "^1.3.0-rc0",
@@ -50,7 +50,7 @@
     "stable": "^0.1.6",
     "tinycolor2": "^1.4.1",
     "whet.extend": "~0.9.9",
-    "zone.js": "0.8.14"
+    "zone.js": "^0.8.14"
   },
   "devDependencies": {
     "@angular/cli": "^1.2.1",
