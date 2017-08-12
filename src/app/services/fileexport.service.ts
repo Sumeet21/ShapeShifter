@@ -125,7 +125,10 @@ export class FileExportService {
     const fileName = `keyframes`;
     zip.file(
       `${fileName}.html`,
-      KeyframeSerializer.createHtml(SvgSerializer.toSvgString(vl), `${fileName}.css`),
+      KeyframeSerializer.createHtml(
+        SvgSerializer.toSvgStringWithExpandedGroups(vl),
+        `${fileName}.css`,
+      ),
     );
     zip.file(`${fileName}.css`, KeyframeSerializer.createCss(anim));
     zip.generateAsync({ type: 'blob' }).then(content => {

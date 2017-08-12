@@ -26,10 +26,11 @@ export function toSvgString(
   y?: number,
   withIdsAndNS = true,
   frameNumber = '',
+  expandGroups = false,
 ) {
   const xmlDoc = document.implementation.createDocument(undefined, 'svg', undefined);
   const rootNode = xmlDoc.documentElement;
-  vectorLayerToSvgNode(vectorLayer, rootNode, xmlDoc, withIdsAndNS, frameNumber);
+  vectorLayerToSvgNode(vectorLayer, rootNode, xmlDoc, withIdsAndNS, frameNumber, expandGroups);
   if (width !== undefined) {
     rootNode.setAttributeNS(undefined, 'width', width.toString() + 'px');
   }
@@ -45,6 +46,20 @@ export function toSvgString(
   return serializeXmlNode(rootNode);
 }
 
+// TODO: improve this api...
+export function toSvgStringWithExpandedGroups(vectorLayer: VectorLayer) {
+  return toSvgString(
+    vectorLayer,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    true,
+  );
+}
+
 /**
  * Helper method that serializes a VectorLayer to a destinationNode in an xmlDoc.
  * The destinationNode should be a <vector> node.
@@ -53,8 +68,9 @@ function vectorLayerToSvgNode(
   vl: VectorLayer,
   destinationNode: HTMLElement,
   xmlDoc: Document,
-  withIdsAndNS = true,
-  frameNumber = '',
+  withIdsAndNS: boolean,
+  frameNumber: string,
+  expandGroups: boolean,
 ) {
   if (withIdsAndNS) {
     destinationNode.setAttributeNS(XMLNS_NS, 'xmlns', SVG_NS);
@@ -203,40 +219,77 @@ function vectorLayerToSvgNode(
         return parentNode;
       }
       if (layer instanceof GroupLayer) {
-        // TODO: create one node per group property being animated
+        let hasTransforms = false;
         const node = xmlDoc.createElement('g');
-        if (withIdsAndNS) {
-          conditionalAttr(node, 'id', layer.name);
-        }
-        const transformValues: string[] = [];
-        if (layer.translateX || layer.translateY) {
-          transformValues.push(`translate(${layer.translateX} ${layer.translateY})`);
-        }
-        if (layer.rotation) {
-          transformValues.push(`rotate(${layer.rotation} ${layer.pivotX} ${layer.pivotY})`);
-        }
-        if (layer.scaleX !== 1 || layer.scaleY !== 1) {
+        let nodeToReturn = node;
+        if (expandGroups) {
+          const pivotNode1 = node;
+          const scaleNode = xmlDoc.createElement('g');
+          pivotNode1.appendChild(scaleNode);
+          const rotateNode = xmlDoc.createElement('g');
+          scaleNode.appendChild(rotateNode);
+          const translateNode = xmlDoc.createElement('g');
+          rotateNode.appendChild(translateNode);
+          const pivotNode2 = xmlDoc.createElement('g');
+          translateNode.appendChild(pivotNode2);
           if (layer.pivotX || layer.pivotY) {
-            transformValues.push(`translate(${layer.pivotX} ${layer.pivotY})`);
+            const transform = `translate(${layer.pivotX},${layer.pivotY})`;
+            pivotNode1.setAttributeNS(undefined, 'transform', transform);
           }
-          transformValues.push(`scale(${layer.scaleX} ${layer.scaleY})`);
+          if (layer.scaleX !== 1 || layer.scaleY !== 1) {
+            const transform = `scale(${layer.scaleX},${layer.scaleY})`;
+            scaleNode.setAttributeNS(undefined, 'transform', transform);
+          }
+          if (layer.rotation) {
+            const transform = `rotate(${layer.rotation})`;
+            rotateNode.setAttributeNS(undefined, 'transform', transform);
+          }
           if (layer.pivotX || layer.pivotY) {
-            transformValues.push(`translate(${-layer.pivotX} ${-layer.pivotY})`);
+            const transform = `translate(${layer.translateX},${layer.translateY})`;
+            translateNode.setAttributeNS(undefined, 'transform', transform);
+          }
+          if (layer.pivotX || layer.pivotY) {
+            const transform = `translate(${-layer.pivotX},${-layer.pivotY})`;
+            pivotNode2.setAttributeNS(undefined, 'transform', transform);
+          }
+          nodeToReturn = pivotNode2;
+          hasTransforms = true;
+        } else {
+          if (withIdsAndNS) {
+            conditionalAttr(node, 'id', layer.name);
+          }
+          const transformValues: string[] = [];
+          if (layer.translateX || layer.translateY) {
+            transformValues.push(`translate(${layer.translateX} ${layer.translateY})`);
+          }
+          if (layer.rotation) {
+            transformValues.push(`rotate(${layer.rotation} ${layer.pivotX} ${layer.pivotY})`);
+          }
+          if (layer.scaleX !== 1 || layer.scaleY !== 1) {
+            if (layer.pivotX || layer.pivotY) {
+              transformValues.push(`translate(${layer.pivotX} ${layer.pivotY})`);
+            }
+            transformValues.push(`scale(${layer.scaleX} ${layer.scaleY})`);
+            if (layer.pivotX || layer.pivotY) {
+              transformValues.push(`translate(${-layer.pivotX} ${-layer.pivotY})`);
+            }
+          }
+          if (transformValues.length) {
+            node.setAttributeNS(undefined, 'transform', transformValues.join(' '));
+            // Creating a wrapper node is necessary if there are transforms on this group.
+            hasTransforms = true;
           }
         }
         let nodeToAttachToParent = node;
-        if (transformValues.length) {
-          node.setAttributeNS(undefined, 'transform', transformValues.join(' '));
-          if (shouldSetClipPathForLayerFn(layer)) {
-            // Create a wrapper node so that the clip-path is applied before the transformations.
-            const wrapperNode = xmlDoc.createElement('g');
-            wrapperNode.appendChild(node);
-            nodeToAttachToParent = wrapperNode;
-          }
+        if (hasTransforms && shouldSetClipPathForLayerFn(layer)) {
+          // Create a wrapper node so that the clip-path is applied before the transformations.
+          const wrapperNode = xmlDoc.createElement('g');
+          wrapperNode.appendChild(node);
+          nodeToAttachToParent = wrapperNode;
         }
         maybeSetClipPathForLayerFn(layer, nodeToAttachToParent);
         parentNode.appendChild(nodeToAttachToParent);
-        return node;
+        return nodeToReturn;
       }
       return undefined;
     },

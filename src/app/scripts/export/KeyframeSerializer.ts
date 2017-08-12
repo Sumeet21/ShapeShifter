@@ -34,23 +34,19 @@ function createCssAnimation(block: AnimationBlock) {
 
 // TODO: don't use the block id here?
 function blockToCssKeyframes(block: AnimationBlock) {
-  const fromProps: string[] = [];
-  const toProps: string[] = [];
   let { fromValue, toValue } = block;
   if (block instanceof PathAnimationBlock) {
     fromValue = `path('${fromValue.getPathString()}')`;
     toValue = `path('${toValue.getPathString()}')`;
   }
   // TODO: need to use the correct property name here?
-  fromProps.push(`${block.propertyName}: ${fromValue}`);
-  toProps.push(`${block.propertyName}: ${toValue}`);
   return `
 @keyframes block_${block.id}_animation {
   from {
-    ${fromProps.join(';\n      ')}
+    ${block.propertyName}: ${fromValue};
   }
   to {
-    ${toProps.join(';\n      ')}
+    ${block.propertyName}: ${toValue};
   }
 }`;
 }
