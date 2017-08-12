@@ -3,7 +3,12 @@ import 'rxjs/add/operator/first';
 import { Injectable } from '@angular/core';
 import { LayerUtil, VectorLayer } from 'app/model/layers';
 import { Animation } from 'app/model/timeline';
-import { AvdSerializer, SpriteSerializer, SvgSerializer } from 'app/scripts/export';
+import {
+  AvdSerializer,
+  KeyframeSerializer,
+  SpriteSerializer,
+  SvgSerializer,
+} from 'app/scripts/export';
 import { State, Store } from 'app/store';
 import { getHiddenLayerIds, getVectorLayer } from 'app/store/layers/selectors';
 import { getAnimation } from 'app/store/timeline/selectors';
@@ -114,7 +119,18 @@ export class FileExportService {
   }
 
   exportCssKeyframes() {
-    // TODO: implement this
+    const vl = this.getVectorLayerWithoutHiddenLayers();
+    const anim = this.getAnimationWithoutHiddenBlocks();
+    const zip = new JSZip();
+    const fileName = `keyframes`;
+    zip.file(
+      `${fileName}.html`,
+      KeyframeSerializer.createHtml(SvgSerializer.toSvgString(vl), `${fileName}.css`),
+    );
+    zip.file(`${fileName}.css`, KeyframeSerializer.createCss(anim));
+    zip.generateAsync({ type: 'blob' }).then(content => {
+      downloadFile(content, `keyframes_${vl.name}.zip`);
+    });
   }
 
   private getVectorLayer() {

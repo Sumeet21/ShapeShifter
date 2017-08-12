@@ -57,6 +57,8 @@ export function createSvgFrames(vectorLayer: VectorLayer, animation: Animation, 
   return svgs;
 }
 
+// TODO: round width to avoid off-by-one pixelation issues?
+// TODO: file size could likely be reduced if we avoided using nested SVGs
 export function createSvgSprite(vectorLayer: VectorLayer, animation: Animation, numSteps: number) {
   const renderer = new AnimationRenderer(vectorLayer, animation);
   const svgs: string[] = [];

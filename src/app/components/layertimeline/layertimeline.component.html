@@ -39,81 +39,80 @@
           </button>
           <button md-menu-item
             (click)="this.onSaveToFileClick()">
-          Save
-        </button>
+            Save
+          </button>
           <button md-menu-item
             (click)="this.onLoadDemoClick()">
-          Demo
-        </button>
+            Demo
+          </button>
         </md-menu>
         <button class="slt-layers-menu-group-button"
           (click)="$event.stopPropagation()"
           [mdMenuTriggerFor]="fileMenu">
-        File
-      </button>
+          File
+        </button>
 
         <!-- Import menu. -->
         <md-menu #importMenu="mdMenu">
           <button md-menu-item
             (click)="this.onLaunchFilePickerClick('addPathsFromSvgButton')">
           SVG
-          <input
-            multiple
-            id="addPathsFromSvgButton"
-            type="file"
-            accept=".svg"
-            (change)="onImportedFilesPicked(($event.target || $event.srcElement).files)">
-        </button>
+            <input
+              multiple
+              id="addPathsFromSvgButton"
+              type="file"
+              accept=".svg"
+              (change)="onImportedFilesPicked(($event.target || $event.srcElement).files)">
+          </button>
           <button md-menu-item
             (click)="this.onLaunchFilePickerClick('addPathsFromXmlButton')">
-          Vector Drawable
-          <input
-            multiple
-            id="addPathsFromXmlButton"
-            type="file"
-            accept=".xml"
-            (change)="onImportedFilesPicked(($event.target || $event.srcElement).files)">
-        </button>
+            Vector Drawable
+            <input
+              multiple
+              id="addPathsFromXmlButton"
+              type="file"
+              accept=".xml"
+              (change)="onImportedFilesPicked(($event.target || $event.srcElement).files)">
+          </button>
         </md-menu>
         <button class="slt-layers-menu-group-button"
           (click)="$event.stopPropagation()"
           [ngClass]="{'is-disabled': model.isActionMode}"
           [disabled]="model.isActionMode"
           [mdMenuTriggerFor]="importMenu">
-        Import
-      </button>
+          Import
+        </button>
 
         <!-- Export menu. -->
         <md-menu #exportMenu="mdMenu">
           <button md-menu-item
             (click)="this.onExportSvgClick()">
-          SVG
-        </button>
+            SVG
+          </button>
           <button md-menu-item
             (click)="this.onExportVectorDrawableClick()">
-          Vector Drawable
-        </button>
+            Vector Drawable
+          </button>
           <button md-menu-item
             (click)="this.onExportAnimatedVectorDrawableClick()">
-          Animated Vector Drawable
-        </button>
+            Animated Vector Drawable
+          </button>
           <button md-menu-item
             (click)="this.onExportSvgSpritesheetClick()">
-          SVG spritesheet
-        </button>
-          <!--<button md-menu-item
-          [disabled]="true"
-          (click)="this.onExportCssKeyframesClick()">
-          CSS keyframes
-        </button>-->
+            SVG spritesheet
+          </button>
+          <button md-menu-item
+            (click)="this.onExportCssKeyframesClick()">
+            CSS keyframes
+          </button>
         </md-menu>
         <button class="slt-layers-menu-group-button"
           (click)="$event.stopPropagation()"
           [ngClass]="{'is-disabled': model.isActionMode}"
           [disabled]="model.isActionMode"
           [mdMenuTriggerFor]="exportMenu">
-        Export
-      </button>
+          Export
+        </button>
 
         <div fxFlex></div>
 
@@ -121,16 +120,16 @@
         <md-menu #addLayerMenu="mdMenu">
           <button md-menu-item
             (click)="this.onAddPathLayerClick()">
-          New path
-        </button>
+            New path
+          </button>
           <button md-menu-item
             (click)="this.onAddClipPathLayerClick()">
-          New clip path
-        </button>
+            New clip path
+          </button>
           <button md-menu-item
             (click)="this.onAddGroupLayerClick()">
-          New group layer
-        </button>
+            New group layer
+          </button>
         </md-menu>
         <button md-icon-button
           (click)="$event.stopPropagation()"
@@ -139,8 +138,8 @@
           mdTooltipShowDelay="500"
           [disabled]="model.isActionMode"
           [mdMenuTriggerFor]="addLayerMenu">
-        <md-icon svgIcon="addlayer"></md-icon>
-      </button>
+          <md-icon svgIcon="addlayer"></md-icon>
+        </button>
       </div>
 
       <div appScrollGroup="timeline"
