@@ -9,8 +9,8 @@ import {
 } from 'app/model/properties';
 import * as _ from 'lodash';
 
-import { MorphableLayer } from '.';
-import { ConstructorArgs as AbstractConstructorArgs, AbstractLayer } from './AbstractLayer';
+import { Layer, ConstructorArgs as LayerConstructorArgs } from './Layer';
+import { MorphableLayer } from './MorphableLayer';
 
 const ENUM_LINECAP_OPTIONS = [
   { value: 'butt', label: 'Butt' },
@@ -61,9 +61,11 @@ const DEFAULTS = {
   new FractionProperty('trimPathEnd', { isAnimatable: true }),
   new FractionProperty('trimPathOffset', { isAnimatable: true }),
   new EnumProperty('fillType', ENUM_FILLTYPE_OPTIONS),
-)
-export // TODO: need to fix enum properties so they store/return strings instead of options?
-class PathLayer extends AbstractLayer implements MorphableLayer {
+) // TODO: need to fix enum properties so they store/return strings instead of options?
+export class PathLayer extends Layer implements MorphableLayer {
+  // @Override
+  readonly type = 'path';
+
   constructor(obj: ConstructorArgs) {
     super(obj);
     const setterFn = (num: number, def: number) => (_.isNil(num) ? def : num);
@@ -82,34 +84,22 @@ class PathLayer extends AbstractLayer implements MorphableLayer {
     this.fillType = obj.fillType || DEFAULTS.fillType;
   }
 
-  getIconName() {
-    return 'pathlayer';
+  // @Override
+  get bounds() {
+    return this.pathData ? this.pathData.getBoundingBox() : undefined;
   }
 
-  getPrefix() {
-    return 'path';
-  }
-
+  // @Override
   clone() {
     return new PathLayer(this);
   }
 
+  // @Override
   deepClone() {
     return this.clone();
   }
 
-  isStroked() {
-    return !!this.strokeColor;
-  }
-
-  isFilled() {
-    return !!this.fillColor;
-  }
-
-  getBoundingBox() {
-    return this.pathData ? this.pathData.getBoundingBox() : undefined;
-  }
-
+  // @Override
   toJSON() {
     const obj = Object.assign(super.toJSON(), {
       pathData: this.pathData ? this.pathData.getPathString() : '',
@@ -133,6 +123,14 @@ class PathLayer extends AbstractLayer implements MorphableLayer {
     });
     return obj;
   }
+
+  isStroked() {
+    return !!this.strokeColor;
+  }
+
+  isFilled() {
+    return !!this.fillColor;
+  }
 }
 
 interface PathLayerArgs {
@@ -151,8 +149,8 @@ interface PathLayerArgs {
   fillType?: FillType;
 }
 
-export interface PathLayer extends AbstractLayer, PathLayerArgs {}
-export interface ConstructorArgs extends AbstractConstructorArgs, PathLayerArgs {}
+export interface PathLayer extends Layer, PathLayerArgs {}
+export interface ConstructorArgs extends LayerConstructorArgs, PathLayerArgs {}
 
 export type StrokeLineCap = 'butt' | 'square' | 'round';
 export type StrokeLineJoin = 'miter' | 'round' | 'bevel';

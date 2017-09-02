@@ -1,5 +1,5 @@
 <ng-container *ngIf="(this.layerModel$ | async) as model">
-  <div class="slt-layer slt-layer-type-{{ this.layer.getIconName() }}"
+  <div class="slt-layer slt-layer-type-{{ this.layer.type }}"
     fxLayout="row"
     fxLayoutAlign="start center"
     [ngClass]="{
@@ -19,7 +19,7 @@
       <md-icon>{{ model.isExpanded ? 'expand_more' : 'chevron_right' }}</md-icon>
     </button>
     <!-- Add extra 20px margin if the expand/collapse icon isn't being displayed -->
-    <md-icon svgIcon="{{ this.layer.getIconName() }}"
+    <md-icon svgIcon="{{ this.layer.type }}"
       [style.margin-left]="model.isExpandable ? '0px' : '20px'">
     </md-icon>
     <span class="slt-layer-id-text"
@@ -39,9 +39,9 @@
         Convert to path
       </button>
       <button *ngIf="model.isMergeable"
-        (click)="this.onMergeGroupClick($event, layer)"
+        (click)="this.onFlattenGroupClick($event, layer)"
         md-menu-item>
-        Merge with {{ this.layer.children.length === 1 ? 'child layer' : 'children layers' }}
+        Flatten group
       </button>
     </md-menu>
     <button md-icon-button
@@ -118,7 +118,7 @@
         (addTimelineBlockClick)="this.onAddTimelineBlockClick($event.event, $event.layer, $event.propertyName)"
         (convertToClipPathClick)="this.onConvertToClipPathClick($event.event, $event.layer)"
         (convertToPathClick)="this.onConvertToPathClick($event.event, $event.layer)"
-        (mergeGroupClick)="this.onMergeGroupClick($event.event, $event.layer)">
+        (flattenGroupClick)="this.onFlattenGroupClick($event.event, $event.layer)">
       </app-layerlisttree>
     </li>
   </ul>

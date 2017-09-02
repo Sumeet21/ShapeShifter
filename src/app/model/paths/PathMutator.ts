@@ -2,10 +2,12 @@ import { MathUtil, Matrix, Point } from 'app/scripts/common';
 import { environment } from 'environments/environment';
 import * as _ from 'lodash';
 
-import { Command, Path, SvgChar } from '.';
+import { Command } from './Command';
 import { CommandState } from './CommandState';
+import { Path } from './Path';
 import { PathState } from './PathState';
 import { SubPathState, SubPathStateMutator, flattenSubPathStates } from './SubPathState';
+import { SvgChar } from './SvgChar';
 
 const ENABLE_LOGS = !environment.production && false;
 
@@ -194,37 +196,28 @@ export class PathMutator {
    */
   unconvertSubPath(subIdx: number) {
     const sps = this.findSubPathStateLeaf(subIdx);
-    const commandStates = sps.getCommandStates().map((cs, csIdx) => {
+    const css = sps.getCommandStates().map((cs, csIdx) => {
       return csIdx === 0 ? cs : cs.mutate().unconvertSubpath().build();
     });
-    this.setSubPathStateLeaf(subIdx, sps.mutate().setCommandStates(commandStates).build());
+    this.setSubPathStateLeaf(subIdx, sps.mutate().setCommandStates(css).build());
     return this;
   }
 
   /**
-   * Adds transforms on the path using the specified transformation matrices.
+   * Transforms the path using the specified transformation matrix.
    */
-  addTransforms(transforms: ReadonlyArray<Matrix>) {
-    return this.applyTransforms(transforms, cs => cs.mutate().addTransforms(transforms).build());
-  }
-
-  /**
-   * Sets transforms on the path using the specified transformation matrices.
-   */
-  setTransforms(transforms: ReadonlyArray<Matrix>) {
-    return this.applyTransforms(transforms, cs => cs.mutate().setTransforms(transforms).build());
-  }
-
-  private applyTransforms(
-    transforms: ReadonlyArray<Matrix>,
-    applyFn: (cs: CommandState) => CommandState,
-  ) {
+  transform(transform: Matrix) {
     const spss = flattenSubPathStates(this.subPathStateMap);
     for (let spsIdx = 0; spsIdx < spss.length; spsIdx++) {
       const sps = spss[spsIdx];
+      const css = sps.getCommandStates();
+      const subIdx = this.subPathOrdering.indexOf(spsIdx);
       this.setSubPathStateLeaf(
-        this.subPathOrdering.indexOf(spsIdx),
-        sps.mutate().setCommandStates(sps.getCommandStates().map(cs => applyFn(cs))).build(),
+        subIdx,
+        sps
+          .mutate()
+          .setCommandStates(css.map(cs => cs.mutate().transform(transform).build()))
+          .build(),
       );
     }
     return this;

@@ -1,7 +1,8 @@
 import 'rxjs/add/observable/combineLatest';
 import 'rxjs/add/observable/merge';
+import 'rxjs/add/operator/map';
 
-import { AfterViewInit, Directive, ElementRef, HostListener, Input } from '@angular/core';
+import { AfterViewInit, Directive, ElementRef, Input } from '@angular/core';
 import {
   ActionMode,
   ActionSource,
@@ -358,7 +359,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     }
     if (this.selectedLayerIds.has(curr.id) || this.selectedBlockLayerIds.has(curr.id)) {
       const root = this.vectorLayer;
-      const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(root, curr.id);
+      const flattenedTransform = LayerUtil.getCanvasTransformForLayer(root, curr.id);
       if (curr instanceof ClipPathLayer) {
         if (curr.pathData && curr.pathData.getCommands().length) {
           CanvasUtil.executeCommands(ctx, curr.pathData.getCommands(), flattenedTransform);
@@ -373,7 +374,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
           ctx.restore();
         }
       } else if (curr instanceof VectorLayer || curr instanceof GroupLayer) {
-        const bounds = curr.getBoundingBox();
+        const bounds = curr.bounds;
         if (bounds) {
           ctx.save();
           const { a, b, c, d, e, f } = flattenedTransform;
@@ -394,7 +395,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
       return;
     }
 
-    const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(
+    const flattenedTransform = LayerUtil.getCanvasTransformForLayer(
       this.vectorLayer,
       this.blockLayerId,
     );
@@ -655,7 +656,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
       } else {
         color = NORMAL_POINT_COLOR;
       }
-      const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(
+      const flattenedTransform = LayerUtil.getCanvasTransformForLayer(
         this.vectorLayer,
         this.blockLayerId,
       );
@@ -683,7 +684,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     ) {
       return;
     }
-    const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(
+    const flattenedTransform = LayerUtil.getCanvasTransformForLayer(
       this.vectorLayer,
       this.blockLayerId,
     );
@@ -714,7 +715,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     }
     const projection = this.segmentSplitter.getProjectionOntoPath().projection;
     if (projection.d < this.minSnapThreshold) {
-      const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(
+      const flattenedTransform = LayerUtil.getCanvasTransformForLayer(
         this.vectorLayer,
         this.blockLayerId,
       );
@@ -736,7 +737,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     if (this.actionMode !== ActionMode.SplitSubPaths || !this.shapeSplitter) {
       return;
     }
-    const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(
+    const flattenedTransform = LayerUtil.getCanvasTransformForLayer(
       this.vectorLayer,
       this.blockLayerId,
     );
@@ -805,7 +806,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     }
   }
 
-  @HostListener('mousedown', ['$event'])
+  // Called by the CanvasComponent.
   onMouseDown(event: MouseEvent) {
     const mouseDown = this.mouseEventToViewportCoords(event);
     if (this.actionSource === ActionSource.Animated && !this.isActionMode) {
@@ -846,7 +847,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     }
   }
 
-  @HostListener('mousemove', ['$event'])
+  // Called by the CanvasComponent.
   onMouseMove(event: MouseEvent) {
     if (this.actionSource === ActionSource.Animated && !this.isActionMode) {
       return;
@@ -868,7 +869,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     }
   }
 
-  @HostListener('mouseup', ['$event'])
+  // Called by the CanvasComponent.
   onMouseUp(event: MouseEvent) {
     if (this.actionSource === ActionSource.Animated && !this.isActionMode) {
       return;
@@ -893,7 +894,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
     }
   }
 
-  @HostListener('mouseleave', ['$event'])
+  // Called by the CanvasComponent.
   onMouseLeave(event: MouseEvent) {
     if (this.actionSource === ActionSource.Animated && !this.isActionMode) {
       return;
@@ -937,7 +938,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
       if ((layer instanceof PathLayer || layer instanceof ClipPathLayer) && layer.pathData) {
         const transformedPoint = MathUtil.transformPoint(
           point,
-          LayerUtil.getFlattenedTransformForLayer(root, layer.id).invert(),
+          LayerUtil.getCanvasTransformForLayer(root, layer.id).invert(),
         );
         let isSegmentInRangeFn: (distance: number, cmd: Command) => boolean;
         isSegmentInRangeFn = distance => {
@@ -962,7 +963,7 @@ export class CanvasOverlayDirective extends CanvasLayoutMixin(DestroyableMixin()
 
   // NOTE: this should only be used in action mode
   performHitTest(mousePoint: Point, opts: HitTestOpts = {}) {
-    const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(
+    const flattenedTransform = LayerUtil.getCanvasTransformForLayer(
       this.vectorLayer,
       this.blockLayerId,
     );
@@ -1026,7 +1027,7 @@ function executeLabeledPoint(
   // Convert the point and the radius to physical pixel coordinates.
   // We do this to avoid fractional font sizes less than 1px, which
   // show up OK on Chrome but not on Firefox or Safari.
-  point = MathUtil.transformPoint(point, Matrix.fromScaling(attrScale, attrScale));
+  point = MathUtil.transformPoint(point, Matrix.scaling(attrScale, attrScale));
   radius *= attrScale;
 
   ctx.save();

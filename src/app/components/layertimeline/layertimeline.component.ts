@@ -1,4 +1,6 @@
 import 'rxjs/add/operator/first';
+import 'rxjs/add/operator/filter';
+import 'rxjs/add/operator/map';
 
 import {
   AfterViewInit,
@@ -756,19 +758,19 @@ export class LayerTimelineComponent extends DestroyableMixin()
   onConvertToClipPathClick(event: MouseEvent, layer: Layer) {
     const clipPathLayer = new ClipPathLayer(layer as PathLayer);
     clipPathLayer.id = _.uniqueId();
-    this.layerTimelineService.replaceLayer(layer.id, clipPathLayer);
+    this.layerTimelineService.swapLayers(layer.id, clipPathLayer);
   }
 
   // @Override LayerListTreeComponentCallbacks
   onConvertToPathClick(event: MouseEvent, layer: Layer) {
     const pathLayer = new PathLayer(layer as ClipPathLayer);
     pathLayer.id = _.uniqueId();
-    this.layerTimelineService.replaceLayer(layer.id, pathLayer);
+    this.layerTimelineService.swapLayers(layer.id, pathLayer);
   }
 
   // @Override LayerListTreeComponentCallbacks
-  onMergeGroupClick(event: MouseEvent, layer: Layer) {
-    this.layerTimelineService.mergeGroupLayer(layer.id);
+  onFlattenGroupClick(event: MouseEvent, layer: Layer) {
+    this.layerTimelineService.flattenGroupLayer(layer.id);
   }
 
   // @Override LayerListTreeComponentCallbacks
@@ -1062,9 +1064,7 @@ export class LayerTimelineComponent extends DestroyableMixin()
 
   // Used by *ngFor loop.
   trackLayerFn(index: number, layer: Layer) {
-    // NOTE: if the layer's prefix changes then recreate the element
-    // TODO: avoid this hack
-    return layer.id + ',' + layer.getPrefix();
+    return layer.id;
   }
 }
 

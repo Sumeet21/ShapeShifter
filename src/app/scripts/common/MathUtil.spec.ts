@@ -1,9 +1,9 @@
-import { MathUtil, Matrix, Point } from '.';
+import { MathUtil, Matrix } from '.';
 
 describe('MathUtil', () => {
   it('#transformPoint', () => {
     const point = { x: 1, y: 1 };
-    const matrix = new Matrix(1, 0, 0, 1, 0, 0);
+    const matrix = Matrix.identity();
     const transformed = MathUtil.transformPoint(point, matrix);
     expect(transformed).toEqual({ x: 1, y: 1 });
   });

@@ -1,8 +1,8 @@
 import { NumberProperty, Property } from 'app/model/properties';
-import { MathUtil, Matrix, Point, Rect } from 'app/scripts/common';
+import { MathUtil, Matrix, Rect } from 'app/scripts/common';
 import * as _ from 'lodash';
 
-import { ConstructorArgs as AbstractConstructorArgs, AbstractLayer } from './AbstractLayer';
+import { Layer, ConstructorArgs as LayerConstructorArgs } from './Layer';
 
 const DEFAULTS = {
   rotation: 0,
@@ -26,7 +26,10 @@ const DEFAULTS = {
   new NumberProperty('translateX', { isAnimatable: true }),
   new NumberProperty('translateY', { isAnimatable: true }),
 )
-export class GroupLayer extends AbstractLayer {
+export class GroupLayer extends Layer {
+  // @Override
+  readonly type = 'group';
+
   constructor(obj: ConstructorArgs) {
     super(obj);
     const setterFn = (num: number, def: number) => (_.isNil(num) ? def : num);
@@ -39,30 +42,11 @@ export class GroupLayer extends AbstractLayer {
     this.translateY = setterFn(obj.translateY, DEFAULTS.translateY);
   }
 
-  getIconName() {
-    return 'grouplayer';
-  }
-
-  getPrefix() {
-    return 'group';
-  }
-
-  clone() {
-    const clone = new GroupLayer(this);
-    clone.children = [...this.children];
-    return clone;
-  }
-
-  deepClone() {
-    const clone = this.clone();
-    clone.children = this.children.map(c => c.deepClone());
-    return clone;
-  }
-
-  getBoundingBox(): Rect {
+  // @Override
+  get bounds() {
     let bounds: { l: number; t: number; r: number; b: number };
     this.children.forEach(child => {
-      const childBounds = child.getBoundingBox();
+      const childBounds = child.bounds;
       if (!childBounds) {
         return;
       }
@@ -83,9 +67,9 @@ export class GroupLayer extends AbstractLayer {
     bounds.r -= this.pivotX;
     bounds.b -= this.pivotY;
     const transforms = [
-      Matrix.fromScaling(this.scaleX, this.scaleY),
-      Matrix.fromRotation(this.rotation),
-      Matrix.fromTranslation(this.translateX, this.translateY),
+      Matrix.scaling(this.scaleX, this.scaleY),
+      Matrix.rotation(this.rotation),
+      Matrix.translation(this.translateX, this.translateY),
     ];
     const topLeft = MathUtil.transformPoint({ x: bounds.l, y: bounds.t }, ...transforms);
     const bottomRight = MathUtil.transformPoint({ x: bounds.r, y: bounds.b }, ...transforms);
@@ -97,6 +81,21 @@ export class GroupLayer extends AbstractLayer {
     };
   }
 
+  // @Override
+  clone() {
+    const clone = new GroupLayer(this);
+    clone.children = [...this.children];
+    return clone;
+  }
+
+  // @Override
+  deepClone() {
+    const clone = this.clone();
+    clone.children = this.children.map(c => c.deepClone());
+    return clone;
+  }
+
+  // @Override
   toJSON() {
     const obj = Object.assign(super.toJSON(), {
       rotation: this.rotation,
@@ -127,5 +126,5 @@ interface GroupLayerArgs {
   translateY?: number;
 }
 
-export interface GroupLayer extends AbstractLayer, GroupLayerArgs {}
-export interface ConstructorArgs extends AbstractConstructorArgs, GroupLayerArgs {}
+export interface GroupLayer extends Layer, GroupLayerArgs {}
+export interface ConstructorArgs extends LayerConstructorArgs, GroupLayerArgs {}

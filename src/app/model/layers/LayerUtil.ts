@@ -1,53 +1,62 @@
 import { Path } from 'app/model/paths';
-import { Matrix } from 'app/scripts/common';
+import { MathUtil, Matrix } from 'app/scripts/common';
 import { environment } from 'environments/environment';
 import * as _ from 'lodash';
 
-import { ClipPathLayer, GroupLayer, Layer, PathLayer, VectorLayer } from '.';
-
-const PRECISION = 8;
+import { ClipPathLayer } from './ClipPathLayer';
+import { GroupLayer } from './GroupLayer';
+import { Layer } from './Layer';
+import { PathLayer } from './PathLayer';
+import { VectorLayer } from './VectorLayer';
 
 const IS_DEV_BUILD = !environment.production;
+
+/**
+ * Returns a single flattened transform matrix that can be used to perform canvas
+ * transform operations. The resulting matrix will transform path coordinates to
+ * canvas drawing coordinates. The inverse of the matrix will transform canvas
+ * drawing coordinates back to path coordinates.
+ */
+export function getCanvasTransformForLayer(root: Layer, layerId: string) {
+  return Matrix.flatten(getCanvasTransformsForLayer(root, layerId));
+}
 
 /**
  * Returns a list of parent transforms for the specified layer ID. The transforms
  * are returned in top-down order (i.e. the transform for the layer's
  * immediate parent will be the very last matrix in the returned list).
  */
-function getTransformsForLayer(root: Layer, layerId: string) {
-  const getTransformsFn = (parents: Layer[], current: Layer): Matrix[] => {
+function getCanvasTransformsForLayer(root: Layer, layerId: string) {
+  return (function recurseFn(parents: Layer[], current: Layer): Matrix[] {
     if (current.id === layerId) {
-      return _.flatMap(parents, layer => {
-        if (layer instanceof GroupLayer) {
-          const l = layer as GroupLayer;
-          return [
-            Matrix.fromTranslation(l.pivotX, l.pivotY),
-            Matrix.fromTranslation(l.translateX, l.translateY),
-            Matrix.fromRotation(l.rotation),
-            Matrix.fromScaling(l.scaleX, l.scaleY),
-            Matrix.fromTranslation(-l.pivotX, -l.pivotY),
-          ];
-        }
-        return [];
+      return _.flatMap(parents, l => {
+        return l instanceof GroupLayer ? getCanvasTransformsForGroupLayer(l) : [];
       });
     }
     for (const child of current.children) {
-      const transforms = getTransformsFn([...parents, current], child);
+      const transforms = recurseFn([...parents, current], child);
       if (transforms) {
         return transforms;
       }
     }
     return undefined;
-  };
-  return getTransformsFn([], root);
+  })([], root);
 }
 
 /**
- * Returns a single flattened transform matrix that can be used to perform canvas
- * transform operations.
+ * Returns a list of matrix transforms for a given group layer.
  */
-export function getFlattenedTransformForLayer(root: Layer, layerId: string) {
-  return Matrix.flatten(...getTransformsForLayer(root, layerId).reverse());
+export function getCanvasTransformsForGroupLayer(l: GroupLayer) {
+  // First negative pivot, then scale, then rotation, then translation, then pivot.
+  // When drawing a path, the transforms are applied at the bottom up, which
+  // is why the order appears to be reversed below.
+  return [
+    Matrix.translation(l.pivotX, l.pivotY),
+    Matrix.translation(l.translateX, l.translateY),
+    Matrix.rotation(l.rotation),
+    Matrix.scaling(l.scaleX, l.scaleY),
+    Matrix.translation(-l.pivotX, -l.pivotY),
+  ];
 }
 
 /**
@@ -67,8 +76,8 @@ export function adjustViewports(vl1: VectorLayer, vl2: VectorLayer) {
     return Math.max(w1, h1, w2, h2, n) === n;
   };
 
-  let scale1 = 1,
-    scale2 = 1;
+  let scale1 = 1;
+  let scale2 = 1;
   if (isMaxDimenFn(w1)) {
     scale2 = w1 / w2;
   } else if (isMaxDimenFn(h1)) {
@@ -80,21 +89,21 @@ export function adjustViewports(vl1: VectorLayer, vl2: VectorLayer) {
   }
 
   if (isMaxDimenFn(w1) || isMaxDimenFn(h1)) {
-    w1 = _.round(w1, PRECISION);
-    h1 = _.round(h1, PRECISION);
-    w2 = _.round(w2 * scale2, PRECISION);
-    h2 = _.round(h2 * scale2, PRECISION);
+    w1 = MathUtil.round(w1);
+    h1 = MathUtil.round(h1);
+    w2 = MathUtil.round(w2 * scale2);
+    h2 = MathUtil.round(h2 * scale2);
   } else {
-    w1 = _.round(w1 * scale1, PRECISION);
-    h1 = _.round(h1 * scale1, PRECISION);
-    w2 = _.round(w2, PRECISION);
-    h2 = _.round(h2, PRECISION);
+    w1 = MathUtil.round(w1 * scale1);
+    h1 = MathUtil.round(h1 * scale1);
+    w2 = MathUtil.round(w2);
+    h2 = MathUtil.round(h2);
   }
 
-  let tx1 = 0,
-    ty1 = 0,
-    tx2 = 0,
-    ty2 = 0;
+  let tx1 = 0;
+  let ty1 = 0;
+  let tx2 = 0;
+  let ty2 = 0;
   if (w1 > w2) {
     tx2 = (w1 - w2) / 2;
   } else if (w1 < w2) {
@@ -106,7 +115,7 @@ export function adjustViewports(vl1: VectorLayer, vl2: VectorLayer) {
   }
 
   const transformLayerFn = (vl: VectorLayer, scale: number, tx: number, ty: number) => {
-    const transforms = [Matrix.fromScaling(scale, scale), Matrix.fromTranslation(tx, ty)];
+    const transforms = Matrix.flatten([Matrix.scaling(scale, scale), Matrix.translation(tx, ty)]);
     (function recurseFn(layer: Layer) {
       if (layer instanceof PathLayer || layer instanceof ClipPathLayer) {
         if (layer instanceof PathLayer && layer.isStroked()) {
@@ -114,9 +123,7 @@ export function adjustViewports(vl1: VectorLayer, vl2: VectorLayer) {
         }
         if (layer.pathData) {
           layer.pathData = new Path(
-            layer.pathData.getCommands().map(cmd => {
-              return cmd.mutate().transform(transforms).build();
-            }),
+            layer.pathData.getCommands().map(cmd => cmd.mutate().transform(transforms).build()),
           );
         }
         return;
@@ -146,7 +153,7 @@ export function adjustViewports(vl1: VectorLayer, vl2: VectorLayer) {
 
 export function mergeVectorLayers(vl1: VectorLayer, vl2: VectorLayer) {
   const { vl1: newVl1, vl2: newVl2 } = adjustViewports(vl1, vl2);
-  const vl: VectorLayer = setLayerChildren(newVl1, [...newVl1.children, ...newVl2.children]);
+  const vl = <VectorLayer>setLayerChildren(newVl1, [...newVl1.children, ...newVl2.children]);
   if (!newVl1.children.length) {
     // Only replace the vector layer's alpha if there are no children
     // being displayed to the user. This is pretty much the best
@@ -211,11 +218,11 @@ export function replaceLayer(vl: VectorLayer, layerId: string, replacement: Laye
   })(vl) as VectorLayer;
 }
 
-export function findLayerByName(vls: ReadonlyArray<VectorLayer>, layerName: string) {
-  for (const vl of vls) {
-    const layer = vl.findLayerByName(layerName);
-    if (layer) {
-      return layer;
+export function findLayerByName(layers: ReadonlyArray<Layer>, layerName: string) {
+  for (const layer of layers) {
+    const target = layer.findLayerByName(layerName);
+    if (target) {
+      return target;
     }
   }
   return undefined;
@@ -276,7 +283,7 @@ export function getUniqueName(prefix = '', objectByNameFn = (s: string) => undef
   return nameFn();
 }
 
-function setLayerChildren(layer: Layer, children: ReadonlyArray<Layer>) {
+function setLayerChildren<T extends Layer>(layer: T, children: ReadonlyArray<Layer>) {
   const clone = layer.clone();
   clone.children = children;
   return clone;

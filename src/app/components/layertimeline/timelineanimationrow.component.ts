@@ -1,3 +1,5 @@
+import 'rxjs/add/operator/map';
+
 import {
   ChangeDetectionStrategy,
   Component,
@@ -82,9 +84,7 @@ export class TimelineAnimationRowComponent implements OnInit, Callbacks {
 
   // Used by *ngFor loop.
   trackLayerFn(index: number, layer: Layer) {
-    // NOTE: if the layer's prefix changes then recreate the element
-    // TODO: avoid this hack
-    return layer.id + ',' + layer.getPrefix();
+    return layer.id;
   }
 }
 
@@ -94,7 +94,6 @@ export interface Callbacks {
   onTimelineBlockDoubleClick(event: MouseEvent, block: AnimationBlock): void;
 }
 
-// tslint:disable: no-unused-variable
 interface AnimationRowEvent {
   readonly event: MouseEvent;
   readonly block: AnimationBlock;

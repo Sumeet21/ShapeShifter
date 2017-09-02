@@ -163,16 +163,16 @@ function vectorLayerToSvgNode(
         conditionalAttr(node, 'stroke-width', layer.strokeWidth, 0);
 
         if (layer.trimPathStart !== 0 || layer.trimPathEnd !== 1 || layer.trimPathOffset !== 0) {
-          const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(vl, layer.id);
+          const flattenedTransform = LayerUtil.getCanvasTransformForLayer(vl, layer.id);
           const { a, d } = flattenedTransform;
           // Note that we only return the length of the first sub path due to
           // https://code.google.com/p/android/issues/detail?id=172547
           let pathLength: number;
-          if (a !== 1 || d !== 1) {
+          if (Math.abs(a) !== 1 || Math.abs(d) !== 1) {
             // Then recompute the scaled path length.
             pathLength = layer.pathData
               .mutate()
-              .addTransforms([flattenedTransform])
+              .transform(flattenedTransform)
               .build()
               .getSubPathLength(0);
           } else {

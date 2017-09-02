@@ -1,4 +1,5 @@
 import 'rxjs/add/observable/merge';
+import 'rxjs/add/operator/map';
 import 'rxjs/add/operator/first';
 
 import { AfterViewInit, Directive, ElementRef, Input } from '@angular/core';
@@ -117,7 +118,7 @@ export class CanvasLayersDirective extends CanvasLayoutMixin(DestroyableMixin())
     }
 
     // If the canvas is disabled, draw the layer to an offscreen canvas
-    // so that we can draw it translucently w/ o affecting the rest of
+    // so that we can draw it translucently w/o affecting the rest of
     // the layer's appearance.
     const layerCtx = currentAlpha < 1 ? this.offscreenCtx : this.renderingCtx;
     this.drawLayer(this.vectorLayer, this.vectorLayer, layerCtx);
@@ -152,7 +153,7 @@ export class CanvasLayersDirective extends CanvasLayoutMixin(DestroyableMixin())
     if (!layer.pathData || !layer.pathData.getCommands().length) {
       return;
     }
-    const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(vl, layer.id);
+    const flattenedTransform = LayerUtil.getCanvasTransformForLayer(vl, layer.id);
     CanvasUtil.executeCommands(ctx, layer.pathData.getCommands(), flattenedTransform);
     ctx.clip();
   }
@@ -163,10 +164,11 @@ export class CanvasLayersDirective extends CanvasLayoutMixin(DestroyableMixin())
     }
     ctx.save();
 
-    const flattenedTransform = LayerUtil.getFlattenedTransformForLayer(vl, layer.id);
-    CanvasUtil.executeCommands(ctx, layer.pathData.getCommands(), flattenedTransform);
+    const canvasTransform = LayerUtil.getCanvasTransformForLayer(vl, layer.id);
+    const flattenedTransform = canvasTransform.invert();
+    CanvasUtil.executeCommands(ctx, layer.pathData.getCommands(), canvasTransform);
 
-    const strokeWidthMultiplier = flattenedTransform.getScale();
+    const strokeWidthMultiplier = flattenedTransform.getScaleFactor();
     ctx.strokeStyle = ColorUtil.androidToCssRgbaColor(layer.strokeColor, layer.strokeAlpha);
     ctx.lineWidth = layer.strokeWidth * strokeWidthMultiplier;
     ctx.fillStyle = ColorUtil.androidToCssRgbaColor(layer.fillColor, layer.fillAlpha);
@@ -179,11 +181,11 @@ export class CanvasLayersDirective extends CanvasLayoutMixin(DestroyableMixin())
       // Note that we only return the length of the first sub path due to
       // https://code.google.com/p/android/issues/detail?id=172547
       let pathLength: number;
-      if (a !== 1 || d !== 1) {
+      if (Math.abs(a) !== 1 || Math.abs(d) !== 1) {
         // Then recompute the scaled path length.
         pathLength = layer.pathData
           .mutate()
-          .addTransforms([flattenedTransform])
+          .transform(flattenedTransform)
           .build()
           .getSubPathLength(0);
       } else {

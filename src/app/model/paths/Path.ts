@@ -1,8 +1,9 @@
-import { Point } from 'app/scripts/common';
+import { Matrix, Point } from 'app/scripts/common';
 import { environment } from 'environments/environment';
 import * as _ from 'lodash';
 
-import { Command, HitOptions, HitResult, Line, Projection, ProjectionOntoPath } from '.';
+import { Line, Projection } from './calculators';
+import { Command } from './Command';
 import { PathMutator } from './PathMutator';
 import * as PathParser from './PathParser';
 import { PathState } from './PathState';
@@ -148,13 +149,6 @@ export class Path {
   }
 
   /**
-   * Returns the number of intersection points of this path with the specified line segment.
-   */
-  intersects(line: Line) {
-    return this.ps.intersects(line);
-  }
-
-  /**
    * Returns the pole of inaccessibility for the specified subpath index.
    */
   getPoleOfInaccessibility(subIdx: number) {
@@ -173,6 +167,13 @@ export class Path {
    */
   isClockwise(subIdx: number) {
     return this.ps.isClockwise(subIdx);
+  }
+
+  /**
+   * Transforms the path using the specified transform matrix.
+   */
+  transform(transform: Matrix) {
+    return this.mutate().transform(transform).build().clone();
   }
 
   /**
